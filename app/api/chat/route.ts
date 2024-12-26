@@ -1,70 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Message as VercelChatMessage, StreamingTextResponse } from "ai";
-
 import { ChatOpenAI } from "@langchain/openai";
-import { PromptTemplate } from "@langchain/core/prompts";
-import { HttpResponseOutputParser } from "langchain/output_parsers";
+import { MemorySaver } from "@langchain/langgraph";
+import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import { SolanaAgentKit, createSolanaTools } from "solana-agent-kit";
 
-const formatMessage = (message: VercelChatMessage) => {
-	return `${message.role}: ${message.content}`;
-};
+const llm = new ChatOpenAI({
+	temperature: 0.7,
+	model: "gpt-4o-mini",
+});
 
-const TEMPLATE = `You are a pirate named Patchy. All responses must be extremely verbose and in pirate dialect.
+const solanaAgent = new SolanaAgentKit(
+	process.env.SOLANA_PRIVATE_KEY!,
+	process.env.RPC_URL,
+	process.env.OPENAI_API_KEY!,
+);
 
-Current conversation:
-{chat_history}
+const tools = createSolanaTools(solanaAgent);
+const memory = new MemorySaver();
 
-User: {input}
-AI:`;
+const agent = createReactAgent({
+	llm,
+	tools,
+	checkpointSaver: memory,
+	messageModifier: `
+      You are a helpful agent that can interact onchain using the Solana Agent Kit. You are
+      empowered to interact onchain using your tools. If you ever need funds, you can request them from the
+      faucet. If not, you can provide your wallet details and request funds from the user. If there is a 5XX
+      (internal) HTTP error code, ask the user to try again later. If someone asks you to do something you
+      can't do with your currently available tools, you must say so, and encourage them to implement it
+      themselves using the Solana Agent Kit, recommend they go to https://www.solanaagentkit.xyz for more information. Be
+      concise and helpful with your responses. Refrain from restating your tools' descriptions unless it is explicitly requested.
+    `,
+});
 
-/**
- * This handler initializes and calls a simple chain with a prompt,
- * chat model, and output parser. See the docs for more information:
- *
- * https://js.langchain.com/docs/guides/expression_language/cookbook#prompttemplate--llm--outputparser
- */
 export async function POST(req: NextRequest) {
 	try {
 		const body = await req.json();
 		const messages = body.messages ?? [];
-		const formattedPreviousMessages = messages.slice(0, -1).map(formatMessage);
-		const currentMessageContent = messages[messages.length - 1].content;
-		const prompt = PromptTemplate.fromTemplate(TEMPLATE);
 
-		/**
-		 * You can also try e.g.:
-		 *
-		 * import { ChatAnthropic } from "@langchain/anthropic";
-		 * const model = new ChatAnthropic({});
-		 *
-		 * See a full list of supported models at:
-		 * https://js.langchain.com/docs/modules/model_io/models/
-		 */
-		const model = new ChatOpenAI({
-			temperature: 0.8,
-			model: "gpt-4o-mini",
+		const eventStream = agent.streamEvents(
+			{
+				messages,
+			},
+			{
+				version: "v2",
+				configurable: {
+					thread_id: "Solana Agent Kit!",
+				},
+			},
+		);
+
+		const textEncoder = new TextEncoder();
+		const transformStream = new ReadableStream({
+			async start(controller) {
+				for await (const { event, data } of eventStream) {
+					if (event === "on_chat_model_stream") {
+						if (!!data.chunk.content) {
+							controller.enqueue(textEncoder.encode(data.chunk.content));
+						}
+					}
+				}
+				controller.close();
+			},
 		});
 
-		/**
-		 * Chat models stream message chunks rather than bytes, so this
-		 * output parser handles serialization and byte-encoding.
-		 */
-		const outputParser = new HttpResponseOutputParser();
-
-		/**
-		 * Can also initialize as:
-		 *
-		 * import { RunnableSequence } from "@langchain/core/runnables";
-		 * const chain = RunnableSequence.from([prompt, model, outputParser]);
-		 */
-		const chain = prompt.pipe(model).pipe(outputParser);
-
-		const stream = await chain.stream({
-			chat_history: formattedPreviousMessages.join("\n"),
-			input: currentMessageContent,
-		});
-
-		return new StreamingTextResponse(stream);
+		return new Response(transformStream);
 	} catch (e: any) {
 		return NextResponse.json({ error: e.message }, { status: e.status ?? 500 });
 	}
