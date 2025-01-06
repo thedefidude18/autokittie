@@ -237,7 +237,7 @@ export function ChatWindow(props: {
 									: ""
 							}
 						>
-							Send
+							 😺 Send
 						</span>
 					</button>
 				</div>

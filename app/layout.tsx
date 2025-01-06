@@ -11,29 +11,29 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<head>
-				<title>SolanaAgentKit + LangChain + Next.js Template</title>
+				<title>autoKittie</title>
 				<link rel="shortcut icon" href="/images/favicon.ico" />
 				<meta
 					name="description"
-					content="Starter template showing how to use SolanaAgentKit with Langchain in Next.js projects."
+					content="🐈 autoKittie by KittyVerse 🐈"
 				/>
 				<meta
 					property="og:title"
-					content="SolanaAgentKit + LangChain + Next.js Template"
+					content="🐈 autoKittie by KittyVerse 🐈"
 				/>
 				<meta
 					property="og:description"
-					content="Starter template showing how to use SolanaAgentKit with LangChain in Next.js projects."
+					content="🐈 autoKittie by KittyVerse 🐈"
 				/>
 				<meta property="og:image" content="/images/title-card.png" />
 				<meta name="twitter:card" content="summary_large_image" />
 				<meta
 					name="twitter:title"
-					content="SolanaAgentKit + LangChain + Next.js Template"
+					content="🐈 autoKittie by KittyVerse 🐈"
 				/>
 				<meta
 					name="twitter:description"
-					content="Starter template showing how to use SolanaAgentKit with LangChain in Next.js projects."
+					content="🐈 autoKittie by KittyVerse 🐈"
 				/>
 				<meta name="twitter:image" content="/images/title-card.png" />
 			</head>
